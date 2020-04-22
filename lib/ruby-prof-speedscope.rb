@@ -2,64 +2,89 @@ require 'json'
 
 module RubyProf
   class SpeedscopePrinter < AbstractPrinter
-    def frame_index(method)
-      @frames ||= []
-      @indexes ||= {} 
-
-      index = @indexes[method]
-      return index if !index.nil?
-
-      name = "#{method.klass_name}##{method.method_name}"
-      name += " *recursive*" if method.recursive?
-      @frames << {
-        name: name,
-        file: method.source_file,
-        line: method.line,
-      }
-      @indexes[method] = @frames.length - 1
-    end
-
     def print_threads
       profiles = []
-      @result.threads.each {|t| profiles << thread_profile(t)}
-      @output << JSON.dump({
-        "$schema": "https://www.speedscope.app/file-format-schema.json",
-        exporter: "ruby-prof-speedscope",
-        shared: {
-          frames: @frames,
-        },
-        profiles: profiles,
-      })
-    end
-
-    def thread_profile(thread)
-      samples = []
-      weights = []
-      print_call_tree(thread.call_tree, []) do |sample, weight|
-        samples << sample
-        weights << weight
-      end
+      @output << <<~HEADER
       {
-        type: 'sampled',
-        name: "Thread: #{thread.id}, Fiber: #{thread.fiber_id}",
-        unit: 'seconds',
-        startValue: 0,
-        endValue: thread.call_tree.measurement.total_time,
-        samples: samples,
-        weights: weights,
-      }
+        "$schema": "https://www.speedscope.app/file-format-schema.json",
+        "exporter": "ruby-prof-speedscope",
+        "shared": {
+          "frames": [
+      HEADER
+
+      frames = {}
+      frame_index = 0
+      @result.threads.each do |thread|
+        thread.methods.each_with_index do |method, idx|
+          next if frames.has_key?(method.object_id)
+          name = "#{method.klass_name}##{method.method_name}"
+          name += " *recursive*" if method.recursive?
+          @output << <<~FRAME
+            {
+              "name": "#{name}",
+              "file": "#{method.source_file}",
+              "line": "#{method.line}"
+            },
+          FRAME
+          frames[method.object_id] = frame_index
+          frame_index += 1
+        end
+      end
+
+      @output << <<~FRAMES
+        {"name": "dummy_trailing_comma"}
+        ]
+        },
+        "profiles": [
+      FRAMES
+
+      @result.threads.each_with_index do |thread, idx|
+        @output << <<~PROFILES
+          {
+            "type": "evented",
+            "name": "Thread: #{thread.id}, Fiber: #{thread.fiber_id}",
+            "unit": "seconds",
+            "startValue": 0,
+            "endValue": #{JSON.dump(thread.call_tree.measurement.total_time)},
+            "events": [
+        PROFILES
+        print_call_tree(thread.call_tree, frames, 0.0, true)
+        @output << <<~PROFILES
+          ]
+          }#{idx < @result.threads.length - 1 ? "," : ""}
+        PROFILES
+      end
+
+      @output << <<~ENDING
+        ]
+        }
+      ENDING
     end
 
-    def print_call_tree(call_tree, current_stack, &block)
-      index = frame_index(call_tree.target)
-      current_stack.push(index)
-      if call_tree.self_time > 0
-        block.call(current_stack.dup, call_tree.self_time)
-      end
+    def print_call_tree(call_tree, frames, start_time, root = false)
+      @output << <<~BEGINEVENT
+        {
+          "type": "O",
+          "frame": #{frames[call_tree.target.object_id]},
+          "at": #{JSON.dump(start_time)}
+        },
+      BEGINEVENT
+
+      original_start_time = start_time
+      start_time += call_tree.self_time
       call_tree.children.each do |child_tree|
-        print_call_tree(child_tree, current_stack, &block)
+        next if child_tree.total_time < 0
+        print_call_tree(child_tree, frames, start_time)
+        start_time += child_tree.total_time
       end
-      current_stack.pop
+
+      @output << <<~CLOSEEVENT
+        {
+          "type": "C",
+          "frame": #{frames[call_tree.target.object_id]},
+          "at": #{JSON.dump(original_start_time + call_tree.total_time)}
+        }#{root ? "" : ","}
+      CLOSEEVENT
     end
   end
 end
