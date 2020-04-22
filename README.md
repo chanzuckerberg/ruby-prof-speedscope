@@ -29,6 +29,10 @@ end
 # Open the trace there.
 ```
 
+## Dependencies
+- Profiler: `ruby-prof` (https://https://ruby-prof.github.io/)
+- Trace Viewer: https://speedscope.app (https://github.com/jlfwong/speedscope/)
+
 ## Contributing
 Contributions and ideas are welcome! Please don't hesitate to open an issue or send a pull request to improve the functionality of this gem.
 
