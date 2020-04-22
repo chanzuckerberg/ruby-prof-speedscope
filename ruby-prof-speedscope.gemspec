@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name          = 'ruby-prof-speedscope'
-  s.version       = '0.1.0'
-  s.date          = '2020-04-12'
+  s.version       = '0.2.0'
+  s.date          = '2020-04-20'
   s.summary       = 'A ruby-prof printer compatible with speedscope.app.'
   s.authors       = ["Chan Zuckerberg Initiative"]
   s.email         = 'opensource@chanzuckerberg.com'
