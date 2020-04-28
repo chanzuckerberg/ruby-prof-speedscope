@@ -5,7 +5,7 @@ A ruby-prof printer compatible with the speedscope.app trace viewer.
 
 ## Installation
 Add to your Gemfile
-```
+```ruby
 gem 'ruby-prof-speedscope'
 ```
 then install.
@@ -14,7 +14,7 @@ $ bundle install
 ```
 
 ## Usage
-```
+```ruby
 # Collect the profile.
 RubyProf.start
   ...
