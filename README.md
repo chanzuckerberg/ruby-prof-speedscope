@@ -21,7 +21,7 @@ RubyProf.start
 results = RubyProf.stop
 
 # Save the printer output.
-File.open("trace.rubyprof") do |f|
+File.open("trace.rubyprof", "w") do |f|
   RubyProf::SpeedscopePrinter.new(results).print(f)
 end
 
